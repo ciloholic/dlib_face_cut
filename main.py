@@ -22,7 +22,8 @@ class OpenCV():
         image_org = cv2.imread(self.image_path)
         image = cv2.cvtColor(image_org, cv2.COLOR_BGR2GRAY)
         cascade = cv2.CascadeClassifier(self.haarcascade)
-        faces = cascade.detectMultiScale(image, scaleFactor=1.1, minNeighbors=1, minSize=(50, 50))
+        minSize = (int(image_org.shape[:1][0] / 10), int(image_org.shape[:1][0] / 10))
+        faces = cascade.detectMultiScale(image, scaleFactor=1.1, minNeighbors=1, minSize=minSize)
         if len(faces) == 0:
             raise Exception('face empty')
         for i, (x, y, w, h) in enumerate(faces):
