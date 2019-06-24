@@ -1,17 +1,20 @@
-from os import getenv
 from os.path import splitext
 from sys import argv
 
 import cv2
 
+from dlib import get_frontal_face_detector, shape_predictor
 
-class OpenCV():
+from imutils import face_utils
+
+from scipy.spatial.distance import euclidean
+
+
+class Dlib():
     def __init__(self):
         self.image_path = ''
-        haarcascade_face = f'{getenv("VIRTUAL_ENV")}/lib/python3.6/site-packages/cv2/data/haarcascade_frontalface_alt2.xml'
-        haarcascade_eye = f'{getenv("VIRTUAL_ENV")}/lib/python3.6/site-packages/cv2/data/haarcascade_eye_tree_eyeglasses.xml'
-        self.cascade_face = cv2.CascadeClassifier(haarcascade_face)
-        self.cascade_eye = cv2.CascadeClassifier(haarcascade_eye)
+        self.predictor = shape_predictor('./shape_predictor_68_face_landmarks.dat')
+        self.detector = get_frontal_face_detector()
 
     def set_image_path(self, image_path=''):
         if not image_path:
@@ -21,21 +24,32 @@ class OpenCV():
     def get_output_path(self, image_cnt=0, eye_cnt=0):
         return f'{splitext(self.image_path)[0]}_i{image_cnt}_e{eye_cnt}{splitext(self.image_path)[1]}'
 
+    def calc_ear(self, eyes):
+        eye_cnt = 0
+        for eye in [eyes[36:42], eyes[42:48]]:
+            A = euclidean(eye[1], eye[5])
+            B = euclidean(eye[2], eye[4])
+            C = euclidean(eye[0], eye[3])
+            if round((A + B) / (2.0 * C), 3) > 0.2:
+                eye_cnt += 1
+        return eye_cnt
+
     def run(self):
         image_org = cv2.imread(self.image_path)
         image = cv2.cvtColor(image_org, cv2.COLOR_BGR2GRAY)
-        minSize = (int(image_org.shape[:1][0] / 10), int(image_org.shape[:1][0] / 10))
-        faces = self.cascade_face.detectMultiScale(image, scaleFactor=1.1, minNeighbors=1, minSize=minSize)
-        if len(faces) == 0:
+        dets, scores, idx = self.detector.run(image, 0)
+        if len(dets) == 0:
             raise Exception('face empty')
-        for i, (x, y, w, h) in enumerate(faces):
-            padding = int(h / 4)
-            x1, x2, y1, y2 = x, x + w, y - padding, y + h + padding
-            eyes = self.cascade_eye.detectMultiScale(image[y1:y2, x1:x2], scaleFactor=1.11, minNeighbors=3, minSize=(10, 10))
-            cv2.imwrite(self.get_output_path(image_cnt=i, eye_cnt=len(eyes)), image_org[y1:y2, x1:x2])
+        for i, rect in enumerate(dets):
+            shape = self.predictor(image, rect)
+            shape = face_utils.shape_to_np(shape)
+            copy = image_org.copy()
+            for (x, y) in shape:
+                cv2.circle(copy, (x, y), 1, (0, 255, 0), -1)
+            cv2.imwrite(self.get_output_path(image_cnt=i, eye_cnt=self.calc_ear(shape)), copy)
 
 
 if __name__ == "__main__":
-    cv = OpenCV()
-    cv.set_image_path(argv[1])
-    cv.run()
+    dlib = Dlib()
+    dlib.set_image_path(argv[1])
+    dlib.run()

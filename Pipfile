@@ -9,6 +9,9 @@ autopep8 = "*"
 flake8-import-order = "*"
 
 [packages]
+dlib = "*"
+imutils = "*"
+scipy = "*"
 opencv-python = "*"
 
 [requires]
